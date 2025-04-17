@@ -62,16 +62,23 @@ class OpenPoseKeyPointMask:
     def INPUT_TYPES(s):
         shapes = ["oval","square","triangle"]
         modes = ["box","torso"]
+        body_parts = [
+            "pose_keypoints_2d",
+            "face_keypoints_2d",
+            "hand_left_keypoints_2d",
+            "hand_right_keypoints_2d",
+        ]
         return {
             "required": {
                 "pose_keypoint": ("POSE_KEYPOINT",),
-                "image_width": ("INT", { "min": 0, "max": MAX_RESOLUTION }),
-                "image_height": ("INT", { "min": 0, "max": MAX_RESOLUTION }),
+                "image_width": ("INT", { "min": 0, "max": MAX_RESOLUTION, "default": 1024}),
+                "image_height": ("INT", { "min": 0, "max": MAX_RESOLUTION, "default": 1024}),
             },
             "optional": {
                 "points_list": ("STRING", {"multiline": True, "default": "1,8,11"}),
                 "mode": (modes,{"default": "box"}),
                 "shape": (shapes,{"default": "oval"}),
+                "body_part": (body_parts,{"default": "pose_keypoints_2d"}),
                 "x_offset": ("FLOAT", { "min": -10, "max": 10, "default": 0.0, "step": 0.05 }),
                 "y_offset": ("FLOAT", { "min": -10, "max": 10, "default": 0.0, "step": 0.05 }),
                 "x_zoom": ("FLOAT", { "min": 0, "max": 100, "default": 1.0, "step": 0.1 }),
@@ -81,7 +88,6 @@ class OpenPoseKeyPointMask:
                 "person_index": ("INT", { "default": -1 }),
                 "auto_rotate": ("BOOLEAN", { "default": True }),
                 "back_hide": ("BOOLEAN", { "default": False }),
-                "alpha": ("FLOAT", { "min": 0, "max": 1, "default": 1, "step": 0.1 }),
             }
         }
 
@@ -115,7 +121,7 @@ class OpenPoseKeyPointMask:
             x=x/pose["canvas_width"]
             y=y/pose["canvas_height"]
         return (x,y,z)
-    def box_keypoint_rotate(self, pose, points_we_want, person_number=0):
+    def box_keypoint_rotate(self, pose, body_part, points_we_want, person_number=0):
         if person_number >= len(pose["people"]):
             return (0,0,0,0,0)
         min_size=10
@@ -123,7 +129,7 @@ class OpenPoseKeyPointMask:
         canvas_height =pose["canvas_height"]
         points=[]
         for element in points_we_want:
-            (x,y,z) = self.get_keypoint_from_list(pose["people"][person_number]["pose_keypoints_2d"], element,pose)
+            (x,y,z) = self.get_keypoint_from_list(pose["people"][person_number][body_part], element,pose)
             if z != 0.0:
                 points.append((x*canvas_width,y*canvas_height))
         
@@ -154,12 +160,12 @@ class OpenPoseKeyPointMask:
                 angle=i
         x,y=rotate_points([[x,y]],center=center,angle_deg=(0-angle))[0]
         return (x/canvas_width,y/canvas_height,width_rc/canvas_width,height_rc/canvas_height,angle)
-    def box_keypoint(self, pose, points_we_want, person_number=0):
+    def box_keypoint(self, pose, body_part, points_we_want, person_number=0):
         if person_number >= len(pose["people"]):
             return (0,0,0,0)
         points=[]
         for element in points_we_want:
-            (x,y,z) = self.get_keypoint_from_list(pose["people"][person_number]["pose_keypoints_2d"], element,pose)
+            (x,y,z) = self.get_keypoint_from_list(pose["people"][person_number][body_part], element,pose)
             if z != 0.0:
                 points.append((x,y))
         if len(points) > 0:
@@ -171,65 +177,65 @@ class OpenPoseKeyPointMask:
             return (0,0,0,0)
         rectangle = self.min_area_rectangle(points)
         return (rectangle[0],rectangle[1],abs(rectangle[0]-rectangle[2]),abs(rectangle[1]-rectangle[3]))
-    def get_torso_width(self,pose,person_number=0):
+    def get_torso_width(self,pose,body_part,person_number=0):
         if person_number >= len(pose["people"]):
             return 0
-        (x,y,z) = self.get_keypoint_from_list(pose["people"][person_number]["pose_keypoints_2d"], 1,pose)
-        (x2,y2,z2) = self.get_keypoint_from_list(pose["people"][person_number]["pose_keypoints_2d"], 2,pose)
+        (x,y,z) = self.get_keypoint_from_list(pose["people"][person_number][body_part], 1,pose)
+        (x2,y2,z2) = self.get_keypoint_from_list(pose["people"][person_number][body_part], 2,pose)
         if z2==0.0:
-            (x2,y2,z2) = self.get_keypoint_from_list(pose["people"][person_number]["pose_keypoints_2d"], 5,pose)
+            (x2,y2,z2) = self.get_keypoint_from_list(pose["people"][person_number][body_part], 5,pose)
         if z != 0.0 and z2 != 0.0:
             return abs(x-x2)*2
         return 0
-    def get_torso_height(self,pose,person_number=0):
+    def get_torso_height(self,pose,body_part,person_number=0):
         if person_number >= len(pose["people"]):
             return 0
-        (x,y,z) = self.get_keypoint_from_list(pose["people"][person_number]["pose_keypoints_2d"], 1,pose)
-        (x2,y2,z2) = self.get_keypoint_from_list(pose["people"][person_number]["pose_keypoints_2d"], 8,pose)
+        (x,y,z) = self.get_keypoint_from_list(pose["people"][person_number][body_part], 1,pose)
+        (x2,y2,z2) = self.get_keypoint_from_list(pose["people"][person_number][body_part], 8,pose)
         if z2==0.0:
-            (x2,y2,z2) = self.get_keypoint_from_list(pose["people"][person_number]["pose_keypoints_2d"], 11,pose)
+            (x2,y2,z2) = self.get_keypoint_from_list(pose["people"][person_number][body_part], 11,pose)
         if z != 0.0 and z2 != 0.0:
             return abs(y-y2)
         return 0
-    def get_torso_angle(self,pose,person_number=0):
+    def get_torso_angle(self,pose,body_part,person_number=0):
         if person_number >= len(pose["people"]):
             return 0
-        (x,y,z) = self.get_keypoint_from_list(pose["people"][person_number]["pose_keypoints_2d"], 1,pose)
-        (x2,y2,z2) = self.get_keypoint_from_list(pose["people"][person_number]["pose_keypoints_2d"], 8,pose)
-        (x3,y3,z3) = self.get_keypoint_from_list(pose["people"][person_number]["pose_keypoints_2d"], 11,pose)
+        (x,y,z) = self.get_keypoint_from_list(pose["people"][person_number][body_part], 1,pose)
+        (x2,y2,z2) = self.get_keypoint_from_list(pose["people"][person_number][body_part], 8,pose)
+        (x3,y3,z3) = self.get_keypoint_from_list(pose["people"][person_number][body_part], 11,pose)
         if z != 0.0 and z2 != 0.0 and z3 != 0.0:
             return math.degrees(math.atan2((x3+x2)/2 - x,(y3+y2)/2 - y))
         return 0
-    def get_head_width(self,pose,person_number=0):
+    def get_head_width(self,pose,body_part,person_number=0):
         if person_number >= len(pose["people"]):
             return 0
-        (x,y,z) = self.get_keypoint_from_list(pose["people"][person_number]["pose_keypoints_2d"], 0,pose)
-        (x2,y2,z2) = self.get_keypoint_from_list(pose["people"][person_number]["pose_keypoints_2d"], 14,pose)
-        (x3,y3,z3) = self.get_keypoint_from_list(pose["people"][person_number]["pose_keypoints_2d"], 17,pose)
+        (x,y,z) = self.get_keypoint_from_list(pose["people"][person_number][body_part], 0,pose)
+        (x2,y2,z2) = self.get_keypoint_from_list(pose["people"][person_number][body_part], 14,pose)
+        (x3,y3,z3) = self.get_keypoint_from_list(pose["people"][person_number][body_part], 17,pose)
         if x3>x2:
             x2=x3
         if z != 0.0 and z2 != 0.0:
             return abs(x-x2)*2
         return 0
-    def get_head_height(self,pose,person_number=0):
+    def get_head_height(self,pose,body_part,person_number=0):
         if person_number >= len(pose["people"]):
             return 0
-        (x,y,z) = self.get_keypoint_from_list(pose["people"][person_number]["pose_keypoints_2d"], 0,pose)
-        (x2,y2,z2) = self.get_keypoint_from_list(pose["people"][person_number]["pose_keypoints_2d"], 1,pose)
+        (x,y,z) = self.get_keypoint_from_list(pose["people"][person_number][body_part], 0,pose)
+        (x2,y2,z2) = self.get_keypoint_from_list(pose["people"][person_number][body_part], 1,pose)
         if z != 0.0 and z2 != 0.0:
             return abs(y-y2)
         return 0
-    def get_back_hide_with(self,pose,person_number=0):
+    def get_back_hide_with(self,pose,body_part,person_number=0):
         if person_number >= len(pose["people"]):
             return 0
-        (x,y,z) = self.get_keypoint_from_list(pose["people"][person_number]["pose_keypoints_2d"], 8,pose)
-        (x2,y2,z2) = self.get_keypoint_from_list(pose["people"][person_number]["pose_keypoints_2d"], 11,pose)
+        (x,y,z) = self.get_keypoint_from_list(pose["people"][person_number][body_part], 8,pose)
+        (x2,y2,z2) = self.get_keypoint_from_list(pose["people"][person_number][body_part], 11,pose)
         if z != 0.0 and z2 != 0.0:
             return x2-x
         return 0
-    def make_shape(self, width, height, rotation,shape,alpha=1.0,x_offset=0, y_offset=0, zoom=1.0,):
+    def make_shape(self, width, height, rotation,shape,x_offset=0, y_offset=0, zoom=1.0,):
         bg_color = (0,0,0)
-        shape_color = (int(255*alpha),int(255*alpha),int(255*alpha))
+        shape_color = (255,255,255)
         if width==0:
             width=1
         if height==0:
@@ -263,8 +269,8 @@ class OpenPoseKeyPointMask:
         result_image = Image.composite(shape_img, back_img, shape_mask) 
         return result_image
     def mask_keypoints(self,pose_keypoint, image_width, image_height, points_list="1,8,11",
-                       mode="box",shape="oval",x_offset=0, y_offset=0, x_zoom=1.0, y_zoom=1.0,x_min=1.0, y_min=1.0,
-                       person_index=-1,auto_rotate=True,back_hide=False,alpha=1.0):
+                       mode="box",shape="oval",body_part="pose_keypoints_2d",x_offset=0, y_offset=0, x_zoom=1.0, y_zoom=1.0,x_min=1.0, y_min=1.0,
+                       person_index=-1,auto_rotate=True,back_hide=False):
         points_we_want = []
         for element in points_list.split(","):
             if element.isdigit():
@@ -276,18 +282,18 @@ class OpenPoseKeyPointMask:
                 if person_index>=0 and person_index!=person_number:
                     continue
                 if mode == "torso":
-                    box=self.box_keypoint(pose, [1], person_number)
-                    point_width=self.get_torso_width(pose,person_number)
-                    point_height=self.get_torso_height(pose,person_number)
+                    box=self.box_keypoint(pose, body_part, [1], person_number)
+                    point_width=self.get_torso_width(pose,body_part,person_number)
+                    point_height=self.get_torso_height(pose,body_part,person_number)
                     if point_width==0:
-                        point_width=self.get_head_width(pose,person_number)*2
+                        point_width=self.get_head_width(pose,body_part,person_number)*2
                     if point_height==0:
-                        point_height=self.get_head_height(pose,person_number)*2
+                        point_height=self.get_head_height(pose,body_part,person_number)*2
                     min_width=point_height/image_width*image_height/2.5
                     if point_width<min_width:
                             point_width=min_width
                     if back_hide:
-                        back_hide_with=self.get_back_hide_with(pose,person_number)*2
+                        back_hide_with=self.get_back_hide_with(pose,body_part,person_number)*2
                         point_width=point_width+back_hide_with if back_hide_with<0 else point_width
                         if point_width<0:
                             point_width=0
@@ -300,9 +306,9 @@ class OpenPoseKeyPointMask:
                     out_img_y=int(box[1]*image_height)
                     out_x_offset=x_offset*point_width*x_zoom*image_width
                     out_y_offset=y_offset*point_height*y_zoom*image_height
-                    shape_img=self.make_shape(int(point_width*image_width*x_zoom),int(point_height*image_height*y_zoom),0,shape,alpha)
+                    shape_img=self.make_shape(int(point_width*image_width*x_zoom),int(point_height*image_height*y_zoom),0,shape)
                     if auto_rotate:
-                        rotation=self.get_torso_angle(pose,person_number)
+                        rotation=self.get_torso_angle(pose,body_part,person_number)
                         shape_img = shape_img.rotate(rotation,expand=True)
                         if rotation<0:
                             out_x_offset=out_x_offset+int(point_height*x_zoom*image_height*math.sin(math.radians(rotation)))
@@ -310,23 +316,23 @@ class OpenPoseKeyPointMask:
                             out_y_offset=out_y_offset-int(point_width*y_zoom*image_width*math.sin(math.radians(rotation)))
                 else:
                     if auto_rotate:
-                        box=self.box_keypoint_rotate(pose, points_we_want, person_number)
+                        box=self.box_keypoint_rotate(pose, body_part, points_we_want, person_number)
                     else:
-                        box=self.box_keypoint(pose, points_we_want, person_number)
+                        box=self.box_keypoint(pose, body_part, points_we_want, person_number)
                     out_img_x=int(box[0]*image_width)
                     out_img_y=int(box[1]*image_height)
                     box_width=int(box[2]*image_width)
                     box_height=int(box[3]*image_height)
                     out_x_offset=x_offset*box_width*x_zoom
                     out_y_offset=y_offset*box_height*y_zoom
-                    if back_hide and self.get_back_hide_with(pose,person_number)<0:
+                    if back_hide and self.get_back_hide_with(pose,body_part,person_number)<0:
                         box_width=0
                         box_height=0
                     if x_min*image_width>box_width:
                         box_width=x_min*image_width
                     if y_min*image_height>box_height:
                         box_height=y_min*image_height
-                    shape_img=self.make_shape(int(box_width*x_zoom),int(box_height*y_zoom),0,shape,alpha)
+                    shape_img=self.make_shape(int(box_width*x_zoom),int(box_height*y_zoom),0,shape)
                     if len(box)==5:
                         rotation=box[4]
                         shape_img = shape_img.rotate(rotation,expand=True)
